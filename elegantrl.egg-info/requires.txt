@@ -1,0 +1,7 @@
+gym
+matplotlib
+numpy
+pybullet
+torch
+opencv-python
+box2d-py

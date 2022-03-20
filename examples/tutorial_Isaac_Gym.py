@@ -1,11 +1,11 @@
 # When using Isaac Gym, isaacgym must be imported before torch.
 import isaacgym
 import torch
-from elegantrl.agent import AgentPPO
-from elegantrl.config import Arguments
+from elegantrl.agents.AgentPPO import AgentPPO
+from elegantrl.train.config import Arguments
 from elegantrl.envs.IsaacGym import IsaacVecEnv, IsaacOneEnv
 from elegantrl.envs.utils.config_utils import get_isaac_env_args
-from elegantrl.run import train_and_evaluate_mp
+from elegantrl.train.run import train_and_evaluate_mp, train_and_evaluate
 
 # Choose an environment by name. If you want to see what's available, just put a random
 # string here and run the code. :)

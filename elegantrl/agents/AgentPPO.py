@@ -2,7 +2,7 @@ import numpy as np
 import torch
 
 from elegantrl.agents.AgentBase import AgentBase
-from elegantrl.agents.net import ActorDiscretePPO, SharePPO
+from elegantrl.agents.net import ActorDiscretePPO
 from elegantrl.agents.net import ActorPPO, CriticPPO
 from typing import Tuple
 

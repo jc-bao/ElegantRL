@@ -1025,3 +1025,11 @@ def compute_grasp_transforms(
     )
 
     return global_franka_rot, global_franka_pos, global_drawer_rot, global_drawer_pos
+
+
+if __name__ == '__main__':
+    '''
+    run random policy
+    '''
+    from elegantrl.train.config import build_env
+    

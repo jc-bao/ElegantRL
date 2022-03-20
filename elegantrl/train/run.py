@@ -2,7 +2,9 @@ import os
 import time
 import torch
 import numpy as np
-import multiprocessing as mp
+# import multiprocessing as mp
+# import pathos
+from pathos.helpers import mp
 
 from elegantrl.train.config import build_env
 from elegantrl.train.evaluator import Evaluator
@@ -61,7 +63,7 @@ def train_and_evaluate(args):
 
 
 def init_agent(args, gpu_id, env=None):
-    agent = args.agent(args.net_dim, args.state_dim, args.action_dim, gpu_id=gpu_id, args=args)
+    agent = args.agent().init(args.net_dim, args.state_dim, args.action_dim, gpu_id=gpu_id)
     agent.save_or_load_agent(args.cwd, if_save=False)
 
     if env is not None:

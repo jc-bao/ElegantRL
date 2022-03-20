@@ -1,0 +1,23 @@
+Metadata-Version: 2.1
+Name: elegantrl
+Version: 0.3.3
+Summary: Lightweight, Efficient and Stable DRL Implementation Using PyTorch
+Home-page: https://github.com/AI4Finance-LLC/ElegantRL
+Author: Xiaoyang Liu, Steven Li, Hongyang Yang, Jiahao Zheng
+Author-email: XL2427@columbia.edu
+License: Apache 2.0
+Keywords: Deep Reinforcment Learning
+Platform: UNKNOWN
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.6
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Classifier: Programming Language :: Python :: Implementation :: PyPy
+Requires-Python: >=3.6
+License-File: LICENSE
+
+UNKNOWN
+
