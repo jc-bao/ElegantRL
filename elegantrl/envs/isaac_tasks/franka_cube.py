@@ -92,6 +92,10 @@ class FrankaCube(VecTask):
       [1.157, -1.066, -0.155, -2.239, -1.841, 1.003, 0.469, 0.035, 0.035],
       device=self.device,
     )
+    self.franka_default_orn = to_torch(
+      [1., 0., 0., 0.], 
+      device = self.device
+    )
     self.dof_state = gymtorch.wrap_tensor(dof_state_tensor)
     self.num_dofs = self.gym.get_sim_dof_count(self.sim) // self.num_envs
     self.franka_dof_targets = torch.zeros(
@@ -390,13 +394,13 @@ class FrankaCube(VecTask):
     self.gym.refresh_rigid_body_state_tensor(self.sim)
 
     # robot observation
-    hand_pos = self.rigid_body_states[:, self.hand_handle][:, 0:3]
-    hand_rot = self.rigid_body_states[:, self.hand_handle][:, 3:7]
-    hand_vel = self.rigid_body_states[:, self.hand_handle][:, 7:10]
-    finger_width = self.rigid_body_states[:, self.lfinger_handle][:,
+    self.hand_pos = self.rigid_body_states[:, self.hand_handle][:, 0:3]
+    self.hand_rot = self.rigid_body_states[:, self.hand_handle][:, 3:7]
+    self.hand_vel = self.rigid_body_states[:, self.hand_handle][:, 7:10]
+    self.finger_width = self.rigid_body_states[:, self.lfinger_handle][:,
                                                                   0:3]+self.rigid_body_states[:, self.rfinger_handle][:, 0:3]
     # object observation
-    block_states = self.rigid_body_statesp[:, self.block_handles]
+    self.block_states = self.rigid_body_statesp[:, self.block_handles]
 
     # store for visualization
     self.franka_lfinger_pos = self.rigid_body_states[:,
@@ -410,7 +414,9 @@ class FrankaCube(VecTask):
 
     self.obs_buf = torch.cat(
       (
-
+        self.hand_pos, self.hand_vel, self.finger_width, # robot
+        self.block_states, # object
+        # goal TODO
       ),
       dim=-1,
     )
@@ -469,8 +475,7 @@ class FrankaCube(VecTask):
 		# set action here
     self.actions = actions.clone().to(self.device)
     # eef
-    orn_err = torch.zeros(
-      (self.num_envs, 3), dtype=torch.float32, device=self.device)
+    orn_err = self.franka_default_orn - self.hand_rot
     pos_err = self.actions[..., :3] * self.dt * self.action_scale
     dpose = torch.cat([pos_err, orn_err], -1).unsqueeze(-1)
     self.franka_dof_targets[:, :self.franka_hand_index] = self.franka_dof_pos.squeeze(
