@@ -171,7 +171,7 @@ class FrankaCube(VecTask):
             franka_asset)
         self.num_franka_dofs = self.gym.get_asset_dof_count(franka_asset)
         self.franka_link_dict = self.gym.get_asset_rigid_body_dict(franka_asset)
-        self.franka_hand_index = self.franka_link_dict["panda_hand"]
+        self.franka_hand_index = self.franka_link_dict["panda_link7"]
         print("num franka bodies: ", self.num_franka_bodies)
         print("num franka dofs: ", self.num_franka_dofs)
 
@@ -358,7 +358,7 @@ class FrankaCube(VecTask):
         self.dof_vel_scale = self.cfg["env"]["dofVelocityScale"]
         _jacobian = self.gym.acquire_jacobian_tensor(self.sim, "franka")
         self.jacobian = gymtorch.wrap_tensor(_jacobian)
-        self.j_eef = self.jacobian[:, self.hand_handle - 1, :, :7]
+        self.j_eef = self.jacobian[:, self.hand_handle - 1, :, :self.franka_hand_index]
 
     def compute_reward(self, actions):
         self.rew_buf[:], self.reset_buf[:] = compute_franka_reward(
@@ -468,10 +468,10 @@ class FrankaCube(VecTask):
         orn_err  = torch.zeros((self.num_envs, 4), dtype=float, device = self.device)
         pos_err = actions[..., :3]*self.dt * self.actions * self.action_scale
         dpose = torch.cat([pos_err, orn_err], -1).unsqueeze(-1)
-        self.franka_dof_targets[:, :7] = self.franka_dof_pos.squeeze(-1)[:, :7] + self.control_ik(dpose)
+        self.franka_dof_targets[:, :self.franka_hand_index] = self.franka_dof_pos.squeeze(-1)[:, :self.franka_hand_index] + self.control_ik(dpose)
         # grip
         grip_acts = (self.actions[..., 3] + 1) *0.02
-        self.franka_dof_targets[:, 7:9] = grip_acts.repeat(-1, -1, 2)
+        self.franka_dof_targets[:, self.franka_hand_index:self.franka_hand_index+2] = grip_acts.repeat(-1, -1, 2)
         # limit
         self.franka_dof_targets[:, : self.num_franka_dofs] = tensor_clamp(
             self.franka_dof_targets[:, : self.num_franka_dofs], self.franka_dof_lower_limits, self.franka_dof_upper_limits
@@ -692,7 +692,7 @@ class FrankaCube(VecTask):
         # solve damped least squares
         j_eef_T = torch.transpose(self.j_eef, 1, 2)
         lmbda = torch.eye(6, device=self.device) * (self.ikconfig.damping ** 2)
-        u = (j_eef_T @ torch.inverse(self.j_eef @ j_eef_T + lmbda) @ dpose).view(self.num_envs, 7)
+        u = (j_eef_T @ torch.inverse(self.j_eef @ j_eef_T + lmbda) @ dpose).view(self.num_envs, self.franka_hand_index)
         return u
 
     def orientation_error(self, desired, current):
