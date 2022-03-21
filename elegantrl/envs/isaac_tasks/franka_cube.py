@@ -466,7 +466,7 @@ class FrankaCube(VecTask):
         self.actions = actions.clone().to(self.device)
         # eef
         orn_err  = torch.zeros((self.num_envs, 4), dtype=float, device = self.device)
-        pos_err = actions[..., :3]*self.dt * self.actions * self.action_scale
+        pos_err = self.actions[..., :3] * self.dt * self.action_scale
         dpose = torch.cat([pos_err, orn_err], -1).unsqueeze(-1)
         self.franka_dof_targets[:, :self.franka_hand_index] = self.franka_dof_pos.squeeze(-1)[:, :self.franka_hand_index] + self.control_ik(dpose)
         # grip
