@@ -357,8 +357,8 @@ class FrankaCube(VecTask):
         # dof
         self.dof_vel_scale = self.cfg["env"]["dofVelocityScale"]
         _jacobian = self.gym.acquire_jacobian_tensor(self.sim, "franka")
-        jacobian = gymtorch.wrap_tensor(_jacobian)
-        self.j_eef = jacobian[:, self.hand_handle - 1, :, :7]
+        self.jacobian = gymtorch.wrap_tensor(_jacobian)
+        self.j_eef = self.jacobian[:, self.hand_handle - 1, :, :7]
 
     def compute_reward(self, actions):
         self.rew_buf[:], self.reset_buf[:] = compute_franka_reward(
@@ -464,28 +464,20 @@ class FrankaCube(VecTask):
 
     def pre_physics_step(self, actions):
         self.actions = actions.clone().to(self.device)
+        # eef
         orn_err  = torch.zeros((self.num_envs, 4), dtype=float, device = self.device)
-        pos_err = actions[..., :3]*0.1
+        pos_err = actions[..., :3]*self.dt * self.actions * self.action_scale
         dpose = torch.cat([pos_err, orn_err], -1).unsqueeze(-1)
-        pos_action[:, :7] = dof_pos.squeeze(-1)[:, :7] + self.control_ik(dpose, j_eff)
-        pos_action[:, 7:9] = grip_acts
-        # Deploy actions
-        self.gym.set_dof_position_target_tensor(self.sim, gymtorch.unwrap_tensor(pos_action))
-        self.gym.set_dof_actuation_force_tensor(self.sim, gymtorch.unwrap_tensor(effort_action))
-
-        targets = (
-            self.franka_dof_targets[:, : self.num_franka_dofs]
-            + self.franka_dof_speed_scales * self.dt * self.actions * self.action_scale
-        )
+        self.franka_dof_targets[:, :7] = self.franka_dof_pos.squeeze(-1)[:, :7] + self.control_ik(dpose)
+        # grip
+        grip_acts = (self.actions[..., 3] + 1) *0.02
+        self.franka_dof_targets[:, 7:9] = grip_acts.repeat(-1, -1, 2)
+        # limit
         self.franka_dof_targets[:, : self.num_franka_dofs] = tensor_clamp(
-            targets, self.franka_dof_lower_limits, self.franka_dof_upper_limits
+            self.franka_dof_targets[:, : self.num_franka_dofs], self.franka_dof_lower_limits, self.franka_dof_upper_limits
         )
-        
-        self.gym.set_dof_position_target_tensor(
-            self.sim, gymtorch.unwrap_tensor(self.franka_dof_targets)
-        )
-        # self.gym.set_dof_actuation_force_tensor(
-        #     self.sim, gymtorch.unwrap_tensor(self.effort_action))
+        # Deploy actions
+        self.gym.set_dof_position_target_tensor(self.sim, gymtorch.unwrap_tensor(self.franka_dof_targets))
 
     def post_physics_step(self):
         self.progress_buf += 1
