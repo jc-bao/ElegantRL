@@ -750,4 +750,4 @@ if __name__ == '__main__':
     env = FrankaCube(cfg=task_config, sim_device='cuda:0',
                      graphics_device_id=0, headless=False)
     while True:
-        env.step(torch.tensor(env.action_space.sample()))
+        env.step(torch.rand((task_config['env']['numEnvs'], *env.action_space.shape)))
