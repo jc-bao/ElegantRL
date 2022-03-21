@@ -692,6 +692,7 @@ class FrankaCube(VecTask):
         # solve damped least squares
         j_eef_T = torch.transpose(self.j_eef, 1, 2)
         lmbda = torch.eye(6, device=self.device) * (self.ikconfig.damping ** 2)
+        print(lmbda.shape, self.j_eef.shape)
         u = (j_eef_T @ torch.inverse(self.j_eef @ j_eef_T + lmbda) @ dpose).view(self.num_envs, self.franka_hand_index)
         return u
 
