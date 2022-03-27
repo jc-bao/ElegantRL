@@ -4,6 +4,7 @@ from isaacgym import gymutil, gymtorch, gymapi
 from isaacgym.torch_utils import *
 import torch
 from attrdict import AttrDict
+import torchgeometry as tgm
 
 from elegantrl.envs.isaac_tasks.base.vec_task import VecTask
 
@@ -90,7 +91,7 @@ class FrankaCube(VecTask):
 		)  # object pos
 		self.num_bodies = self.rigid_body_states.shape[1]
 		self.franka_default_dof_pos = to_torch(
-			[1.157, -1.066, -0.155, -2.239, -1.841, 1.003, 0.469, 0.035, 0.035],
+			[0, 0, 0, -1.57, 0, 1.82, 0, 0.035, 0.035],
 			device=self.device,
 		)
 		self.franka_default_orn = to_torch(
@@ -107,6 +108,25 @@ class FrankaCube(VecTask):
 		]
 		self.franka_dof_pos = self.franka_dof_state[..., 0]
 		self.franka_dof_vel = self.franka_dof_state[..., 1]
+
+		# robot observation
+		self.hand_pos = self.rigid_body_states[:, self.hand_handle][:, 0:3]
+		self.hand_rot = self.rigid_body_states[:, self.hand_handle][:, 3:7]
+		self.hand_vel = self.rigid_body_states[:, self.hand_handle][:, 7:10]
+		self.finger_width = self.rigid_body_states[:, self.lfinger_handle][:,
+																																	0:3]+self.rigid_body_states[:, self.rfinger_handle][:, 0:3]
+		# object observation
+		self.block_states = self.rigid_body_states[:, self.block_handles]
+
+		# store for visualization
+		self.franka_lfinger_pos = self.rigid_body_states[:,
+																										 self.lfinger_handle][:, 0:3]
+		self.franka_rfinger_pos = self.rigid_body_states[:,
+																										 self.rfinger_handle][:, 0:3]
+		self.franka_lfinger_rot = self.rigid_body_states[:,
+																										 self.lfinger_handle][:, 3:7]
+		self.franka_rfinger_rot = self.rigid_body_states[:,
+																										 self.rfinger_handle][:, 3:7]
 
 		self.gym.refresh_actor_root_state_tensor(self.sim)
 		self.gym.refresh_dof_state_tensor(self.sim)
@@ -394,49 +414,20 @@ class FrankaCube(VecTask):
 		self.gym.refresh_dof_state_tensor(self.sim)
 		self.gym.refresh_rigid_body_state_tensor(self.sim)
 
-		# robot observation
-		self.hand_pos = self.rigid_body_states[:, self.hand_handle][:, 0:3]
-		self.hand_rot = self.rigid_body_states[:, self.hand_handle][:, 3:7]
-		self.hand_vel = self.rigid_body_states[:, self.hand_handle][:, 7:10]
-		self.finger_width = self.rigid_body_states[:, self.lfinger_handle][:,
-																																	0:3]+self.rigid_body_states[:, self.rfinger_handle][:, 0:3]
-		# object observation
-		self.block_states = self.rigid_body_statesp[:, self.block_handles]
-
-		# store for visualization
-		self.franka_lfinger_pos = self.rigid_body_states[:,
-																										 self.lfinger_handle][:, 0:3]
-		self.franka_rfinger_pos = self.rigid_body_states[:,
-																										 self.rfinger_handle][:, 0:3]
-		self.franka_lfinger_rot = self.rigid_body_states[:,
-																										 self.lfinger_handle][:, 3:7]
-		self.franka_rfinger_rot = self.rigid_body_states[:,
-																										 self.rfinger_handle][:, 3:7]
-
 		self.obs_buf = torch.cat(
 			(
 				self.hand_pos, self.hand_vel, self.finger_width, # robot
-				self.block_states, # object
+				self.block_states.view(self.num_blocks, -1), # object
 				# goal TODO
 			),
-			dim=-1,
+			dim=-1
 		)
 
 		return self.obs_buf
 
 	def reset_idx(self, env_ids):
 		# reset franka
-		pos = tensor_clamp(
-			self.franka_default_dof_pos.unsqueeze(0)
-			+ 0.25
-			* (
-				torch.rand((len(env_ids), self.num_franka_dofs),
-									 device=self.device)
-				- 0.5
-			),
-			self.franka_dof_lower_limits,
-			self.franka_dof_upper_limits,
-		)
+		pos = self.franka_default_dof_pos
 		self.franka_dof_pos[env_ids, :] = pos
 		self.franka_dof_vel[env_ids, :] = torch.zeros_like(
 			self.franka_dof_vel[env_ids])
@@ -476,7 +467,8 @@ class FrankaCube(VecTask):
 		# set action here
 		self.actions = actions.clone().to(self.device)
 		# eef
-		orn_err = self.franka_default_orn - self.hand_rot
+		orn_err = self.hand_rot - self.franka_default_orn
+		orn_err = tgm.quaternion_to_angle_axis(orn_err)
 		pos_err = self.actions[..., :3] * self.dt * self.action_scale
 		dpose = torch.cat([pos_err, orn_err], -1).unsqueeze(-1)
 		self.franka_dof_targets[:, :self.franka_hand_index] = self.franka_dof_pos.squeeze(
@@ -746,10 +738,9 @@ if __name__ == '__main__':
 	import yaml
 	with open('/home/reed/rl/ElegantRL/elegantrl/envs/isaac_configs/FrankaCube.yaml') as config_file:
 		task_config = yaml.load(config_file, Loader=yaml.SafeLoader)
-	print(task_config)
 	task_config['env']['numEnvs'] = 2
 	env = FrankaCube(cfg=task_config, sim_device='cpu',
 									 graphics_device_id=0, headless=False)
 	while True:
-		env.step(torch.rand(
+		env.step(torch.zeros(
 			(task_config['env']['numEnvs'], *env.action_space.shape)))
